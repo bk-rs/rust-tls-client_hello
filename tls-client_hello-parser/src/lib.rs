@@ -1,4 +1,4 @@
-use std::io;
+use std::io::{self, ErrorKind};
 
 pub use rustls::internal::msgs::handshake::ClientHelloPayload;
 use rustls::internal::msgs::{
@@ -28,7 +28,12 @@ impl Parser {
 
     // ref https://github.com/ctz/rustls/blob/v/0.18.0/rustls/src/msgs/deframer.rs#L54-L79
     pub fn parse(&mut self, buf: &mut impl io::Read) -> io::Result<ParseOutput> {
-        self.message_deframer.read(buf)?;
+        self.message_deframer
+            .read(buf)
+            .or_else(|e| match e.kind() {
+                ErrorKind::Interrupted => Ok(0),
+                _ => Err(e),
+            })?;
 
         match self.message_deframer.frames.pop_front() {
             Some(mut msg) => {
